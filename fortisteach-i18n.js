@@ -4,7 +4,7 @@
   const STORAGE_KEY = 'fortisteachLanguage';
   const DEFAULT_LANGUAGE = 'en';
   const SUPPORTED = ['en', 'hy', 'ru'];
-  const LABELS = { en: 'EN', hy: 'HY', ru: 'RU' };
+  const LABELS = { en: 'En', hy: 'Hy', ru: 'Ru' };
   const translations = window.FortisTeachTranslations || { en: {}, hy: {}, ru: {} };
   const textRecords = new Map();
   const attrRecords = [];
@@ -160,29 +160,30 @@
 
   function bindLanguageButtons() {
     document.querySelectorAll('[data-lang]').forEach((button) => {
+      // The main dropdown trigger opens the menu; it must never switch language.
+      if (
+        button.matches(
+          '.fortis-language-trigger, [data-language-trigger], [data-desktop-language-trigger] .fortis-language-trigger'
+        )
+      ) {
+        button.removeAttribute('data-lang');
+        return;
+      }
+
       if (button.dataset.ftI18nBound === 'true') return;
+
+      const lang = button.getAttribute('data-lang');
+      if (!SUPPORTED.includes(lang)) return;
+
       button.dataset.ftI18nBound = 'true';
       button.addEventListener('click', (event) => {
         event.preventDefault();
-        const lang = button.getAttribute('data-lang');
-        if (SUPPORTED.includes(lang)) applyLanguage(lang);
+        applyLanguage(lang);
       });
     });
   }
 
-  function inferLanguageAttributes() {
-    const candidates = document.querySelectorAll('a,button,[role="button"],.w-dropdown-link');
-    candidates.forEach((element) => {
-      if (element.hasAttribute('data-lang')) return;
-      const text = normalize(element.textContent).toUpperCase();
-      if (text === 'EN' || text === 'HY' || text === 'RU') {
-        element.setAttribute('data-lang', text.toLowerCase());
-      }
-    });
-  }
-
   function refresh() {
-    inferLanguageAttributes();
     bindLanguageButtons();
     cacheSubtree(document.body);
     cacheMeta();
@@ -222,9 +223,30 @@
     return result;
   }
 
+  async function copyMissing() {
+    const result = debugMissing();
+    const output = JSON.stringify(result, null, 2);
+
+    try {
+      await navigator.clipboard.writeText(output);
+      console.info('FortisTeach i18n: missing strings copied to clipboard.');
+    } catch (error) {
+      console.info('FortisTeach i18n: copy the array below manually.');
+      console.log(output);
+    }
+
+    return result;
+  }
+
   function init() {
     currentLanguage = initialLanguage();
-    inferLanguageAttributes();
+
+    // Clean up data-lang accidentally added by older versions of this script.
+    document.querySelectorAll('.fortis-language-trigger[data-lang]').forEach((trigger) => {
+      trigger.removeAttribute('data-lang');
+      delete trigger.dataset.ftI18nBound;
+    });
+
     bindLanguageButtons();
     cacheSubtree(document.body);
     cacheMeta();
@@ -255,6 +277,7 @@
     window.setFortisTeachLanguage = applyLanguage;
     window.fortisTeachRefreshI18n = refresh;
     window.fortisTeachI18nDebug = debugMissing;
+    window.fortisTeachCopyMissingI18n = copyMissing;
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
